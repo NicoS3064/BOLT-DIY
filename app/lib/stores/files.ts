@@ -601,12 +601,12 @@ export class FilesStore {
         exclude: ['**/node_modules', '.git'],
         includeContent: true,
       },
-      bufferWatchEvents(100, async (eventChunks: unknown[][]) => {
-        // Flatten the nested arrays and cast to expected PathWatcherEvent[]
-        const flatEvents = eventChunks.flat() as PathWatcherEvent[];
+      bufferWatchEvents(100, async (eventChunks) => {
+        const flatEvents = eventChunks.flat() as unknown as PathWatcherEvent[];
         await this.#processEventBuffer(flatEvents);
       })
     );
+
 
 
     // Get the current chat ID
