@@ -11,8 +11,9 @@ import { join } from 'path';
 
 dotenv.config();
 
-const isVercel = process.env.VERCEL === '1'; // ✅ Vercel build guard
+const isVercel = process.env.VERCEL === '1';
 
+// ✅ Get Git metadata safely
 const getGitInfo = () => {
   try {
     return {
@@ -22,11 +23,7 @@ const getGitInfo = () => {
       author: execSync('git log -1 --format=%an').toString().trim(),
       email: execSync('git log -1 --format=%ae').toString().trim(),
       remoteUrl: execSync('git config --get remote.origin.url').toString().trim(),
-      repoName: execSync('git config --get remote.origin.url')
-        .toString()
-        .trim()
-        .replace(/^.*github.com[:/]/, '')
-        .replace(/\.git$/, ''),
+      repoName: execSync('git config --get remote.origin.url').toString().trim().replace(/^.*github.com[:/]/, '').replace(/\.git$/, ''),
     };
   } catch {
     return {
@@ -41,6 +38,7 @@ const getGitInfo = () => {
   }
 };
 
+// ✅ Read package.json safely
 const getPackageJson = () => {
   try {
     const pkgPath = join(process.cwd(), 'package.json');
@@ -117,7 +115,7 @@ export default defineConfig((config) => {
           return null;
         },
       },
-      !isVercel && config.mode !== 'test' && remixCloudflareDevProxy(), // ✅ skip on Vercel
+      !isVercel && config.mode !== 'test' && remixCloudflareDevProxy(),
       remixVitePlugin({
         future: {
           v3_fetcherPersist: true,
