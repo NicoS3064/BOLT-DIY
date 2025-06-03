@@ -1,5 +1,4 @@
 import type { PathWatcherEvent, WebContainer } from '@webcontainer/api';
-import { getEncoding } from 'istextorbinary';
 import { map, type MapStore } from 'nanostores';
 import { Buffer } from 'node:buffer';
 import { path } from '~/utils/path';
@@ -597,9 +596,18 @@ export class FilesStore {
 
     // Set up file watcher
     webcontainer.internal.watchPaths(
-      { include: [`${WORK_DIR}/**`], exclude: ['**/node_modules', '.git'], includeContent: true },
-      bufferWatchEvents(100, this.#processEventBuffer.bind(this)),
+      {
+        include: [`${WORK_DIR}/**`],
+        exclude: ['**/node_modules', '.git'],
+        includeContent: true,
+      },
+      bufferWatchEvents(100, async (eventChunks: unknown[][]) => {
+        // Flatten the nested arrays and cast to expected PathWatcherEvent[]
+        const flatEvents = eventChunks.flat() as PathWatcherEvent[];
+        await this.#processEventBuffer(flatEvents);
+      })
     );
+
 
     // Get the current chat ID
     const currentChatId = getCurrentChatId();
@@ -689,7 +697,7 @@ export class FilesStore {
     }
   }
 
-  #processEventBuffer(events: Array<[events: PathWatcherEvent[]]>) {
+  async #processEventBuffer(events: Array<PathWatcherEvent>) {
     const watchEvents = events.flat(2);
 
     for (const { type, path, buffer } of watchEvents) {
@@ -727,7 +735,7 @@ export class FilesStore {
            * The reason we do this is because we don't want to display binary files
            * in the editor nor allow to edit them.
            */
-          const isBinary = isBinaryFile(buffer);
+          const isBinary = await isBinaryFile(buffer);
 
           if (!isBinary) {
             content = this.#decodeFileContent(buffer);
@@ -928,13 +936,17 @@ export class FilesStore {
   }
 }
 
-function isBinaryFile(buffer: Uint8Array | undefined) {
-  if (buffer === undefined) {
-    return false;
+async function isBinaryFile(buffer: Uint8Array | undefined): Promise<boolean> {
+  if (!buffer) return false;
+
+  if (typeof window === 'undefined') {
+    const { getEncoding } = await import('istextorbinary');
+    return getEncoding(convertToBuffer(buffer), { chunkLength: 100 }) === 'binary';
   }
 
-  return getEncoding(convertToBuffer(buffer), { chunkLength: 100 }) === 'binary';
+  return false;
 }
+
 
 /**
  * Converts a `Uint8Array` into a Node.js `Buffer` by copying the prototype.
