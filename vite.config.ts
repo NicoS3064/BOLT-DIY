@@ -95,7 +95,7 @@ export default defineConfig((config) => ({
   },
   resolve: {
     alias: {
-       istextorbinary: emptyModulePath, // ✅ disables broken browser module
+       'istextorbinary': isVercel ? emptyModulePath : 'istextorbinary',
     },
   },
   plugins: [
