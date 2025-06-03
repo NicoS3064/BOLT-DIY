@@ -8,12 +8,15 @@ import * as dotenv from 'dotenv';
 import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import path from 'path';
+
+
+const emptyModulePath = path.resolve(__dirname, 'vite.empty-module.js');
 
 dotenv.config();
 
 const isVercel = process.env.VERCEL === '1';
 
-// ✅ Get Git metadata safely
 const getGitInfo = () => {
   try {
     return {
@@ -38,12 +41,10 @@ const getGitInfo = () => {
   }
 };
 
-// ✅ Read package.json safely
 const getPackageJson = () => {
   try {
     const pkgPath = join(process.cwd(), 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-
     return {
       name: pkg.name,
       description: pkg.description,
@@ -69,82 +70,86 @@ const getPackageJson = () => {
 const pkg = getPackageJson();
 const gitInfo = getGitInfo();
 
-export default defineConfig((config) => {
-  return {
-    define: {
-      __COMMIT_HASH: JSON.stringify(gitInfo.commitHash),
-      __GIT_BRANCH: JSON.stringify(gitInfo.branch),
-      __GIT_COMMIT_TIME: JSON.stringify(gitInfo.commitTime),
-      __GIT_AUTHOR: JSON.stringify(gitInfo.author),
-      __GIT_EMAIL: JSON.stringify(gitInfo.email),
-      __GIT_REMOTE_URL: JSON.stringify(gitInfo.remoteUrl),
-      __GIT_REPO_NAME: JSON.stringify(gitInfo.repoName),
-      __APP_VERSION: JSON.stringify(process.env.npm_package_version),
-      __PKG_NAME: JSON.stringify(pkg.name),
-      __PKG_DESCRIPTION: JSON.stringify(pkg.description),
-      __PKG_LICENSE: JSON.stringify(pkg.license),
-      __PKG_DEPENDENCIES: JSON.stringify(pkg.dependencies),
-      __PKG_DEV_DEPENDENCIES: JSON.stringify(pkg.devDependencies),
-      __PKG_PEER_DEPENDENCIES: JSON.stringify(pkg.peerDependencies),
-      __PKG_OPTIONAL_DEPENDENCIES: JSON.stringify(pkg.optionalDependencies),
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+export default defineConfig((config) => ({
+  define: {
+    __COMMIT_HASH: JSON.stringify(gitInfo.commitHash),
+    __GIT_BRANCH: JSON.stringify(gitInfo.branch),
+    __GIT_COMMIT_TIME: JSON.stringify(gitInfo.commitTime),
+    __GIT_AUTHOR: JSON.stringify(gitInfo.author),
+    __GIT_EMAIL: JSON.stringify(gitInfo.email),
+    __GIT_REMOTE_URL: JSON.stringify(gitInfo.remoteUrl),
+    __GIT_REPO_NAME: JSON.stringify(gitInfo.repoName),
+    __APP_VERSION: JSON.stringify(process.env.npm_package_version),
+    __PKG_NAME: JSON.stringify(pkg.name),
+    __PKG_DESCRIPTION: JSON.stringify(pkg.description),
+    __PKG_LICENSE: JSON.stringify(pkg.license),
+    __PKG_DEPENDENCIES: JSON.stringify(pkg.dependencies),
+    __PKG_DEV_DEPENDENCIES: JSON.stringify(pkg.devDependencies),
+    __PKG_PEER_DEPENDENCIES: JSON.stringify(pkg.peerDependencies),
+    __PKG_OPTIONAL_DEPENDENCIES: JSON.stringify(pkg.optionalDependencies),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+  },
+  build: {
+    target: 'esnext',
+    sourcemap: false, // ✅ suppress sourcemap resolution errors
+  },
+  resolve: {
+    alias: {
+       istextorbinary: emptyModulePath, // ✅ disables broken browser module
     },
-    build: {
-      target: 'esnext',
-    },
-    plugins: [
-      nodePolyfills({
-        include: ['buffer', 'process', 'util', 'stream'],
-        globals: {
-          Buffer: true,
-          process: true,
-          global: true,
-        },
-        protocolImports: true,
-        exclude: ['child_process', 'fs', 'path'],
-      }),
-      {
-        name: 'buffer-polyfill',
-        transform(code: string, id: string) {
-          if (id.includes('env.mjs')) {
-            return {
-              code: `import { Buffer } from 'buffer';\n${code}`,
-              map: null,
-            };
-          }
-          return null;
-        },
+  },
+  plugins: [
+    nodePolyfills({
+      include: ['buffer', 'process', 'util', 'stream'],
+      globals: {
+        Buffer: true,
+        process: true,
+        global: true,
       },
-      !isVercel && config.mode !== 'test' && remixCloudflareDevProxy(),
-      remixVitePlugin({
-        future: {
-          v3_fetcherPersist: true,
-          v3_relativeSplatPath: true,
-          v3_throwAbortReason: true,
-          v3_lazyRouteDiscovery: true,
-        },
-      }),
-      UnoCSS(),
-      tsconfigPaths(),
-      chrome129IssuePlugin(),
-      config.mode === 'production' && optimizeCssModules({ apply: 'build' }),
-    ].filter(Boolean),
-    envPrefix: [
-      'VITE_',
-      'OPENAI_LIKE_API_BASE_URL',
-      'OLLAMA_API_BASE_URL',
-      'LMSTUDIO_API_BASE_URL',
-      'TOGETHER_API_BASE_URL',
-    ],
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler',
-        },
+      protocolImports: true,
+      exclude: ['child_process', 'fs', 'path'],
+    }),
+    {
+      name: 'buffer-polyfill',
+      transform(code: string, id: string) {
+        if (id.includes('env.mjs')) {
+          return {
+            code: `import { Buffer } from 'buffer';\n${code}`,
+            map: null,
+          };
+        }
+        return null;
       },
     },
-  };
-});
+    !isVercel && config.mode !== 'test' && remixCloudflareDevProxy(),
+    remixVitePlugin({
+      future: {
+        v3_fetcherPersist: true,
+        v3_relativeSplatPath: true,
+        v3_throwAbortReason: true,
+        v3_lazyRouteDiscovery: true,
+      },
+    }),
+    UnoCSS(),
+    tsconfigPaths(),
+    chrome129IssuePlugin(),
+    config.mode === 'production' && optimizeCssModules({ apply: 'build' }),
+  ].filter(Boolean),
+  envPrefix: [
+    'VITE_',
+    'OPENAI_LIKE_API_BASE_URL',
+    'OLLAMA_API_BASE_URL',
+    'LMSTUDIO_API_BASE_URL',
+    'TOGETHER_API_BASE_URL',
+  ],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler',
+      },
+    },
+  },
+}));
 
 function chrome129IssuePlugin() {
   return {
